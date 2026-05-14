@@ -18,19 +18,8 @@ interface StockRow {
   item_discount: string;
 }
 
-interface PopupStore {
-  id_location: string;
-  popup_name: string;
-  popup_location: string;
-}
-
-interface MasterItem {
-  item_sku: string;
-  item_name: string;
-  item_variant: string;
-  item_category: string;
-  item_hpj: string;
-}
+interface PopupStore { id_location: string; popup_name: string; popup_location: string; }
+interface MasterItem { item_sku: string; item_name: string; item_variant: string; item_category: string; item_hpj: string; }
 
 export default function StockPage() {
   const { data: session } = useSession();
@@ -53,9 +42,7 @@ export default function StockPage() {
     setLoading(true);
     const params = selectedPopup ? `?popup_id=${selectedPopup}` : "";
     const [stockRes, popupRes, itemRes] = await Promise.all([
-      fetch(`/api/stock${params}`),
-      fetch("/api/popup"),
-      fetch("/api/master-items"),
+      fetch(`/api/stock${params}`), fetch("/api/popup"), fetch("/api/master-items"),
     ]);
     const [s, p, i] = await Promise.all([stockRes.json(), popupRes.json(), itemRes.json()]);
     setStock(s.data ?? []);
@@ -67,14 +54,13 @@ export default function StockPage() {
   useEffect(() => { fetchData(); }, [fetchData]);
 
   const columns: ColumnDef<StockRow, unknown>[] = [
-    { header: "Popup ID", accessorKey: "stock_popup_id" },
+    { header: "Popup", accessorKey: "stock_popup_id" },
     { header: "SKU", accessorKey: "item_sku" },
     { header: "Nama Item", accessorKey: "item_name" },
     { header: "Varian", accessorKey: "item_variant" },
     { header: "Kategori", accessorKey: "item_category" },
     {
-      header: "Qty",
-      accessorKey: "item_qty",
+      header: "Qty", accessorKey: "item_qty",
       cell: ({ row }) => (
         <span className={`font-semibold ${Number(row.original.item_qty) === 0 ? "text-red-500" : "text-green-600 dark:text-green-400"}`}>
           {row.original.item_qty}
@@ -82,8 +68,7 @@ export default function StockPage() {
       ),
     },
     {
-      header: "HPJ",
-      accessorKey: "item_hpj",
+      header: "HPJ", accessorKey: "item_hpj",
       cell: ({ row }) => `Rp ${Number(row.original.item_hpj).toLocaleString("id-ID")}`,
     },
   ];
@@ -122,21 +107,27 @@ export default function StockPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-5 md:mb-6">
         <div className="flex items-center gap-2">
           <Package className="w-5 h-5" />
-          <h1 className="text-xl font-semibold">Stock</h1>
+          <h1 className="text-lg md:text-xl font-semibold">Stock</h1>
         </div>
         {isAdmin && (
           <div className="flex gap-2">
-            <button onClick={() => setShowBulk(true)} className="flex items-center gap-1.5 px-3 py-2 text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800">
-              <Upload className="w-3.5 h-3.5" /> Bulk Upload
+            <button
+              onClick={() => setShowBulk(true)}
+              className="flex items-center gap-1.5 px-3 py-2 text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800"
+            >
+              <Upload className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Bulk Upload</span>
             </button>
             <button
               onClick={() => { if (!selectedPopup) { setMsg("Pilih popup terlebih dahulu"); return; } setShowAdd(true); }}
               className="flex items-center gap-1.5 px-3 py-2 text-sm bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-lg hover:opacity-90"
             >
-              <Plus className="w-3.5 h-3.5" /> Tambah Stock
+              <Plus className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Tambah Stock</span>
+              <span className="sm:hidden">Tambah</span>
             </button>
           </div>
         )}
@@ -153,7 +144,7 @@ export default function StockPage() {
         <select
           value={selectedPopup}
           onChange={(e) => setSelectedPopup(e.target.value)}
-          className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm outline-none"
+          className="w-full sm:w-auto rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm outline-none"
         >
           <option value="">Semua Popup</option>
           {popups.map((p) => (
@@ -176,7 +167,7 @@ export default function StockPage() {
             <select
               value={addForm.item_sku}
               onChange={(e) => setAddForm({ ...addForm, item_sku: e.target.value })}
-              className="w-full rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 px-3 py-2 text-sm outline-none"
+              className="w-full rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 px-3 py-2.5 text-sm outline-none"
             >
               <option value="">Pilih Item</option>
               {items.map((i) => (
@@ -190,13 +181,13 @@ export default function StockPage() {
               type="number"
               value={addForm.item_qty}
               onChange={(e) => setAddForm({ ...addForm, item_qty: e.target.value })}
-              className="w-full rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 px-3 py-2 text-sm outline-none"
+              className="w-full rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 px-3 py-2.5 text-sm outline-none"
             />
           </div>
           <button
             onClick={handleAddStock}
             disabled={saving}
-            className="w-full bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 py-2 rounded-lg text-sm font-medium disabled:opacity-50"
+            className="w-full bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 py-2.5 rounded-lg text-sm font-medium disabled:opacity-50"
           >
             {saving ? "Menyimpan..." : "Simpan"}
           </button>
@@ -213,14 +204,14 @@ export default function StockPage() {
           <textarea
             value={bulkCsv}
             onChange={(e) => setBulkCsv(e.target.value)}
-            rows={8}
-            placeholder={"stock_popup_id,item_sku,item_qty\nPOP-001,SKU-001,10\nPOP-001,SKU-002,5"}
+            rows={6}
+            placeholder={"stock_popup_id,item_sku,item_qty\nPOP-001,SKU-001,10"}
             className="w-full rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 px-3 py-2 text-sm font-mono outline-none"
           />
           <button
             onClick={handleBulkUpload}
             disabled={saving}
-            className="w-full bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 py-2 rounded-lg text-sm font-medium disabled:opacity-50"
+            className="w-full bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 py-2.5 rounded-lg text-sm font-medium disabled:opacity-50"
           >
             {saving ? "Memproses..." : "Upload"}
           </button>

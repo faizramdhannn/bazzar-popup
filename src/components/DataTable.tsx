@@ -8,7 +8,6 @@ import {
   ColumnDef,
 } from "@tanstack/react-table";
 import { useState } from "react";
-import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 interface DataTableProps<T> {
@@ -38,15 +37,17 @@ export function DataTable<T>({ data, columns }: DataTableProps<T>) {
         placeholder="Cari..."
         className="w-full max-w-xs rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100"
       />
-      <div className="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-800">
-        <table className="w-full text-sm">
+
+      {/* Horizontal scroll wrapper */}
+      <div className="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-800 -mx-0">
+        <table className="w-full text-xs md:text-sm min-w-[500px]">
           <thead className="bg-zinc-50 dark:bg-zinc-800/50">
             {table.getHeaderGroups().map((hg) => (
               <tr key={hg.id}>
                 {hg.headers.map((header) => (
                   <th
                     key={header.id}
-                    className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide whitespace-nowrap"
+                    className="px-3 md:px-4 py-2.5 md:py-3 text-left text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide whitespace-nowrap"
                   >
                     {flexRender(header.column.columnDef.header, header.getContext())}
                   </th>
@@ -71,7 +72,7 @@ export function DataTable<T>({ data, columns }: DataTableProps<T>) {
                   className="bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors"
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id} className="px-4 py-3 whitespace-nowrap">
+                    <td key={cell.id} className="px-3 md:px-4 py-2.5 md:py-3 whitespace-nowrap">
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </td>
                   ))}
@@ -81,10 +82,10 @@ export function DataTable<T>({ data, columns }: DataTableProps<T>) {
           </tbody>
         </table>
       </div>
-      <div className="flex items-center justify-between text-sm text-zinc-500">
-        <span>
-          {table.getFilteredRowModel().rows.length} baris
-        </span>
+
+      {/* Pagination */}
+      <div className="flex items-center justify-between text-xs md:text-sm text-zinc-500">
+        <span>{table.getFilteredRowModel().rows.length} baris</span>
         <div className="flex items-center gap-2">
           <button
             onClick={() => table.previousPage()}
