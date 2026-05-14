@@ -4,7 +4,7 @@ import { useSession } from "next-auth/react";
 import { DataTable } from "@/components/DataTable";
 import { Modal } from "@/components/Modal";
 import { ColumnDef } from "@tanstack/react-table";
-import { Plus, Trash2, ShoppingCart, Minus } from "lucide-react";
+import { Plus, Trash2, ShoppingCart } from "lucide-react";
 import { SessionUser } from "@/types";
 import { formatDate } from "@/lib/utils";
 
@@ -13,7 +13,7 @@ interface SalesRow {
   sales_id: string;
   item_sku: string;
   item_name: string;
-  item_variant: string;
+  item_category: string;
   item_qty: string;
   delivery_note: string;
   created_by: string;
@@ -101,12 +101,6 @@ export default function SalesPage() {
     scanInputRef.current?.focus();
   }
 
-  function handleQtyChange(sku: string, delta: number) {
-    setSessionItems((prev) =>
-      prev.map((r) => r.item_sku === sku ? { ...r, item_qty: Math.max(1, r.item_qty + delta) } : r)
-    );
-  }
-
   function handleRemoveItem(sku: string) {
     setSessionItems((prev) => prev.filter((r) => r.item_sku !== sku));
   }
@@ -163,7 +157,7 @@ export default function SalesPage() {
     { header: "Popup", accessorKey: "sales_user_id" },
     { header: "SKU", accessorKey: "item_sku" },
     { header: "Nama Item", accessorKey: "item_name" },
-    { header: "Varian", accessorKey: "item_variant" },
+    { header: "Kategori", accessorKey: "item_category" },
     { header: "Qty", accessorKey: "item_qty" },
     { header: "DN", accessorKey: "delivery_note" },
     { header: "Oleh", accessorKey: "created_by" },
@@ -177,6 +171,8 @@ export default function SalesPage() {
       ),
     } as ColumnDef<SalesRow, unknown>] : []),
   ];
+
+  const totalUnits = sessionItems.reduce((s, r) => s + r.item_qty, 0);
 
   return (
     <div>
@@ -211,6 +207,7 @@ export default function SalesPage() {
       {/* Add Sales Modal */}
       <Modal open={showAdd} onClose={() => setShowAdd(false)} title="Tambah Penjualan" size="lg">
         <div className="space-y-4">
+          {/* Popup selector */}
           <div>
             <label className="block text-xs font-medium text-zinc-500 mb-1">Popup</label>
             <select
@@ -226,6 +223,7 @@ export default function SalesPage() {
             </select>
           </div>
 
+          {/* Scan input */}
           <div>
             <label className="block text-xs font-medium text-zinc-500 mb-1">Scan Barcode</label>
             <div className="flex gap-2">
@@ -256,45 +254,40 @@ export default function SalesPage() {
             )}
           </div>
 
+          {/* Items table — clean, compact, no colors */}
           <div>
-            <p className="text-xs font-medium text-zinc-500 mb-1">
-              Items ({sessionItems.length} SKU · {sessionItems.reduce((s, r) => s + r.item_qty, 0)} unit)
+            <p className="text-xs text-zinc-400 mb-1.5">
+              {sessionItems.length} SKU · {totalUnits} unit
             </p>
             <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
-              <div className="max-h-52 overflow-y-auto">
+              <div className="max-h-56 overflow-y-auto">
                 <table className="w-full text-xs">
-                  <thead className="bg-zinc-50 dark:bg-zinc-800/60 sticky top-0">
+                  <thead className="sticky top-0 bg-zinc-50 dark:bg-zinc-800/80 border-b border-zinc-200 dark:border-zinc-700">
                     <tr>
-                      <th className="px-2 py-2 text-left font-medium text-zinc-400 w-8">#</th>
-                      <th className="px-2 py-2 text-left font-medium text-zinc-400">SKU / Nama</th>
-                      <th className="px-2 py-2 text-center font-medium text-zinc-400 w-28">Qty</th>
-                      <th className="px-2 py-2 w-6"></th>
+                      <th className="px-2 py-1.5 text-left font-medium text-zinc-400 w-7">No.</th>
+                      <th className="px-2 py-1.5 text-left font-medium text-zinc-400">Item Code</th>
+                      <th className="px-2 py-1.5 text-left font-medium text-zinc-400">Item Name</th>
+                      <th className="px-2 py-1.5 text-right font-medium text-zinc-400 w-10">Qty</th>
+                      <th className="px-2 py-1.5 w-7"></th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
+                  <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
                     {sessionItems.length === 0 ? (
-                      <tr><td colSpan={4} className="px-3 py-8 text-center text-zinc-400">No Data</td></tr>
+                      <tr>
+                        <td colSpan={5} className="px-3 py-8 text-center text-zinc-400">No Data</td>
+                      </tr>
                     ) : (
                       sessionItems.map((r, idx) => (
-                        <tr key={r.item_sku} className="bg-white dark:bg-zinc-900">
-                          <td className="px-2 py-2 text-zinc-400 text-center">{idx + 1}</td>
-                          <td className="px-2 py-2">
-                            <div className="font-mono text-zinc-500">{r.item_sku}</div>
-                            <div className="text-zinc-400 truncate max-w-[140px]">{r.item_name}</div>
-                          </td>
-                          <td className="px-2 py-2">
-                            <div className="flex items-center justify-center gap-1.5">
-                              <button onClick={() => handleQtyChange(r.item_sku, -1)} className="w-6 h-6 flex items-center justify-center rounded border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400">
-                                <Minus className="w-2.5 h-2.5" />
-                              </button>
-                              <span className="font-semibold w-6 text-center tabular-nums">{r.item_qty}</span>
-                              <button onClick={() => handleQtyChange(r.item_sku, +1)} className="w-6 h-6 flex items-center justify-center rounded border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400">
-                                <Plus className="w-2.5 h-2.5" />
-                              </button>
-                            </div>
-                          </td>
-                          <td className="px-1 py-2 text-center">
-                            <button onClick={() => handleRemoveItem(r.item_sku)} className="p-1 rounded text-zinc-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+                        <tr key={r.item_sku}>
+                          <td className="px-2 py-1.5 text-zinc-400 text-center">{idx + 1}</td>
+                          <td className="px-2 py-1.5 font-mono text-zinc-500 dark:text-zinc-400">{r.item_sku}</td>
+                          <td className="px-2 py-1.5 text-zinc-600 dark:text-zinc-300 truncate max-w-[140px]">{r.item_name}</td>
+                          <td className="px-2 py-1.5 text-right font-medium tabular-nums">{r.item_qty}</td>
+                          <td className="px-1 py-1.5 text-center">
+                            <button
+                              onClick={() => handleRemoveItem(r.item_sku)}
+                              className="p-1 rounded text-zinc-300 hover:text-red-500 transition-colors"
+                            >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           </td>
@@ -309,8 +302,12 @@ export default function SalesPage() {
 
           {saveError && <p className="text-xs text-red-500">{saveError}</p>}
 
+          {/* Actions */}
           <div className="flex gap-2 pt-1 border-t border-zinc-100 dark:border-zinc-800">
-            <button onClick={() => setShowAdd(false)} className="flex-1 py-2.5 text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800">
+            <button
+              onClick={() => setShowAdd(false)}
+              className="flex-1 py-2.5 text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800"
+            >
               Batal
             </button>
             <button

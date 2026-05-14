@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { DataTable } from "@/components/DataTable";
 import { Modal } from "@/components/Modal";
 import { ColumnDef } from "@tanstack/react-table";
-import { Plus, Trash2, ClipboardList, Eye, Pencil, Minus } from "lucide-react";
+import { Plus, Trash2, ClipboardList, Eye, Pencil } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 
 interface OpnameGroup {
@@ -119,14 +119,6 @@ export default function OpnamePage() {
     scanInputRef.current?.focus();
   }
 
-  function handleQtyChange(sku: string, delta: number) {
-    setSessionItems((prev) =>
-      prev.map((r) =>
-        r.item_sku === sku ? { ...r, real_scan: Math.max(1, r.real_scan + delta) } : r
-      )
-    );
-  }
-
   function handleRemoveItem(sku: string) {
     setSessionItems((prev) => prev.filter((r) => r.item_sku !== sku));
   }
@@ -234,18 +226,20 @@ export default function OpnamePage() {
     },
   ];
 
+  // Detail columns: No, Item Code, Item Name, Real Scan, Cutoff, Selisih
   const detailColumns: ColumnDef<OpnameDetail, unknown>[] = [
     { header: "No.", id: "no", cell: ({ row }) => <span className="text-zinc-400">{row.index + 1}</span> },
-    { header: "SKU", accessorKey: "item_sku" },
-    { header: "Item", accessorKey: "item_name" },
-    { header: "Real", accessorKey: "item_qty" },
+    { header: "Item Code", accessorKey: "item_sku" },
+    { header: "Item Name", accessorKey: "item_name" },
+    { header: "Real Scan", accessorKey: "item_qty" },
     { header: "Cutoff", accessorKey: "item_cutoff_qty" },
     {
-      header: "Selisih", id: "diff",
+      header: "Selisih", id: "selisih",
       cell: ({ row }) => {
         const diff = Number(row.original.item_qty) - Number(row.original.item_cutoff_qty);
+        if (diff === 0) return <span className="text-zinc-400 tabular-nums">0</span>;
         return (
-          <span className={diff < 0 ? "text-red-500 font-medium" : diff > 0 ? "text-green-500 font-medium" : "text-zinc-400"}>
+          <span className={`font-medium tabular-nums ${diff > 0 ? "text-green-600 dark:text-green-400" : "text-red-500"}`}>
             {diff > 0 ? `+${diff}` : diff}
           </span>
         );
@@ -265,6 +259,8 @@ export default function OpnamePage() {
       ),
     },
   ];
+
+  const totalUnits = sessionItems.reduce((s, r) => s + r.real_scan, 0);
 
   return (
     <div>
@@ -293,6 +289,7 @@ export default function OpnamePage() {
       {/* Scan Session Modal */}
       <Modal open={showSession} onClose={() => setShowSession(false)} title="Sesi Stock Opname" size="lg">
         <div className="space-y-4">
+          {/* Popup selector */}
           <div>
             <label className="block text-xs font-medium text-zinc-500 mb-1">Popup</label>
             <select
@@ -308,6 +305,7 @@ export default function OpnamePage() {
             </select>
           </div>
 
+          {/* Scan input */}
           <div>
             <label className="block text-xs font-medium text-zinc-500 mb-1">Scan Barcode</label>
             <div className="flex gap-2">
@@ -338,48 +336,40 @@ export default function OpnamePage() {
             )}
           </div>
 
-          {/* Items list */}
+          {/* Items table — clean, compact, no colors */}
           <div>
-            <p className="text-xs font-medium text-zinc-500 mb-1">
-              Items ({sessionItems.length} SKU · {sessionItems.reduce((s, r) => s + r.real_scan, 0)} unit)
+            <p className="text-xs text-zinc-400 mb-1.5">
+              {sessionItems.length} SKU · {totalUnits} unit
             </p>
             <div className="rounded-lg border border-zinc-200 dark:border-zinc-800 overflow-hidden">
-              <div className="max-h-52 overflow-y-auto">
+              <div className="max-h-56 overflow-y-auto">
                 <table className="w-full text-xs">
-                  <thead className="bg-zinc-50 dark:bg-zinc-800/60 sticky top-0">
+                  <thead className="sticky top-0 bg-zinc-50 dark:bg-zinc-800/80 border-b border-zinc-200 dark:border-zinc-700">
                     <tr>
-                      <th className="px-2 py-2 text-left font-medium text-zinc-400 w-8">#</th>
-                      <th className="px-2 py-2 text-left font-medium text-zinc-400">SKU / Nama</th>
-                      <th className="px-2 py-2 text-center font-medium text-zinc-400 w-28">Qty</th>
-                      <th className="px-2 py-2 w-6"></th>
+                      <th className="px-2 py-1.5 text-left font-medium text-zinc-400 w-7">No.</th>
+                      <th className="px-2 py-1.5 text-left font-medium text-zinc-400">Item Code</th>
+                      <th className="px-2 py-1.5 text-left font-medium text-zinc-400">Item Name</th>
+                      <th className="px-2 py-1.5 text-right font-medium text-zinc-400 w-16">Real Scan</th>
+                      <th className="px-2 py-1.5 w-7"></th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
+                  <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
                     {sessionItems.length === 0 ? (
                       <tr>
-                        <td colSpan={4} className="px-3 py-8 text-center text-zinc-400">No Data</td>
+                        <td colSpan={5} className="px-3 py-8 text-center text-zinc-400">No Data</td>
                       </tr>
                     ) : (
                       sessionItems.map((r, idx) => (
-                        <tr key={r.item_sku} className="bg-white dark:bg-zinc-900">
-                          <td className="px-2 py-2 text-zinc-400 text-center">{idx + 1}</td>
-                          <td className="px-2 py-2">
-                            <div className="font-mono text-zinc-500">{r.item_sku}</div>
-                            <div className="text-zinc-400 truncate max-w-[140px]">{r.item_name}</div>
-                          </td>
-                          <td className="px-2 py-2">
-                            <div className="flex items-center justify-center gap-1.5">
-                              <button onClick={() => handleQtyChange(r.item_sku, -1)} className="w-6 h-6 flex items-center justify-center rounded border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400">
-                                <Minus className="w-2.5 h-2.5" />
-                              </button>
-                              <span className="font-semibold w-6 text-center tabular-nums">{r.real_scan}</span>
-                              <button onClick={() => handleQtyChange(r.item_sku, +1)} className="w-6 h-6 flex items-center justify-center rounded border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400">
-                                <Plus className="w-2.5 h-2.5" />
-                              </button>
-                            </div>
-                          </td>
-                          <td className="px-1 py-2 text-center">
-                            <button onClick={() => handleRemoveItem(r.item_sku)} className="p-1 rounded text-zinc-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+                        <tr key={r.item_sku}>
+                          <td className="px-2 py-1.5 text-zinc-400 text-center">{idx + 1}</td>
+                          <td className="px-2 py-1.5 font-mono text-zinc-500 dark:text-zinc-400">{r.item_sku}</td>
+                          <td className="px-2 py-1.5 text-zinc-600 dark:text-zinc-300 truncate max-w-[140px]">{r.item_name}</td>
+                          <td className="px-2 py-1.5 text-right font-medium tabular-nums">{r.real_scan}</td>
+                          <td className="px-1 py-1.5 text-center">
+                            <button
+                              onClick={() => handleRemoveItem(r.item_sku)}
+                              className="p-1 rounded text-zinc-300 hover:text-red-500 transition-colors"
+                            >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           </td>
@@ -394,8 +384,12 @@ export default function OpnamePage() {
 
           {saveError && <p className="text-xs text-red-500">{saveError}</p>}
 
+          {/* Actions */}
           <div className="flex gap-2 pt-1 border-t border-zinc-100 dark:border-zinc-800">
-            <button onClick={() => setShowSession(false)} className="flex-1 py-2.5 text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800">
+            <button
+              onClick={() => setShowSession(false)}
+              className="flex-1 py-2.5 text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800"
+            >
               Batal
             </button>
             <button
@@ -411,7 +405,64 @@ export default function OpnamePage() {
 
       {/* Detail Modal */}
       <Modal open={!!showDetail} onClose={() => setShowDetail(null)} title={`Detail: ${showDetail}`} size="lg">
-        <DataTable data={detail} columns={detailColumns} />
+        <div className="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-800">
+          <table className="w-full text-xs md:text-sm min-w-[500px]">
+            <thead className="bg-zinc-50 dark:bg-zinc-800/50">
+              <tr>
+                <th className="px-2 py-1.5 text-left text-xs font-medium text-zinc-400 w-7">No.</th>
+                <th className="px-2 py-1.5 text-left text-xs font-medium text-zinc-400">Item Code</th>
+                <th className="px-2 py-1.5 text-left text-xs font-medium text-zinc-400">Item Name</th>
+                <th className="px-2 py-1.5 text-right text-xs font-medium text-zinc-400">Real Scan</th>
+                <th className="px-2 py-1.5 text-right text-xs font-medium text-zinc-400">Cutoff</th>
+                <th className="px-2 py-1.5 text-right text-xs font-medium text-zinc-400">Selisih</th>
+                <th className="px-2 py-1.5 text-xs font-medium text-zinc-400 w-14">Aksi</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
+              {detail.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-8 text-center text-zinc-400">Tidak ada data</td>
+                </tr>
+              ) : (
+                detail.map((row, idx) => {
+                  const diff = Number(row.item_qty) - Number(row.item_cutoff_qty);
+                  const rowBg =
+                    diff === 0
+                      ? "bg-green-50 dark:bg-green-900/10"
+                      : "bg-red-50 dark:bg-red-900/10";
+                  return (
+                    <tr key={row.item_sku} className={rowBg}>
+                      <td className="px-2 py-1.5 text-zinc-400 text-center text-xs">{idx + 1}</td>
+                      <td className="px-2 py-1.5 font-mono text-xs text-zinc-500 dark:text-zinc-400 whitespace-nowrap">{row.item_sku}</td>
+                      <td className="px-2 py-1.5 text-xs text-zinc-700 dark:text-zinc-200 max-w-[160px] truncate" title={row.item_name}>{row.item_name}</td>
+                      <td className="px-2 py-1.5 text-right text-xs tabular-nums">{row.item_qty}</td>
+                      <td className="px-2 py-1.5 text-right text-xs tabular-nums text-zinc-500">{row.item_cutoff_qty}</td>
+                      <td className="px-2 py-1.5 text-right text-xs tabular-nums font-medium">
+                        {diff === 0 ? (
+                          <span className="text-zinc-400">0</span>
+                        ) : diff > 0 ? (
+                          <span className="text-green-600 dark:text-green-400">+{diff}</span>
+                        ) : (
+                          <span className="text-red-500">{diff}</span>
+                        )}
+                      </td>
+                      <td className="px-2 py-1.5">
+                        <div className="flex gap-0.5">
+                          <button onClick={() => { setEditRow(row); setEditQty(row.item_qty); }} className="p-1 rounded hover:bg-white/60 dark:hover:bg-zinc-800">
+                            <Pencil className="w-3 h-3" />
+                          </button>
+                          <button onClick={() => handleDeleteItem(row.opname_id, row.item_sku)} className="p-1 rounded text-red-400 hover:text-red-600">
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
       </Modal>
 
       {/* Edit Modal */}
