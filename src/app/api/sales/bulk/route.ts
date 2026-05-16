@@ -45,8 +45,8 @@ export async function POST(req: NextRequest) {
       ])
     );
 
-    const salesIds = generateSalesIds(salesRows, items.length);
-    const dnIds = generateDeliveryNoteIds(dnRows, items.length);
+const [salesId] = generateSalesIds(salesRows, 1);
+const [dnId] = generateDeliveryNoteIds(dnRows, 1);
 
     // VALIDATE
     const errors: { item_sku: string; error: string }[] = [];
@@ -93,31 +93,31 @@ export async function POST(req: NextRequest) {
     await batchUpdateRows("master_data", stockUpdates);
 
     // WRITE 2: batch append sales_data (1 API call)
-    await batchAppendRows("sales_data", items.map((item, i) => {
-      const sku = item.item_sku.toUpperCase();
-      const m = itemMap.get(sku)!;
-      return [sales_user_id, salesIds[i], sku, m.item_name, m.item_variant ?? "",
-        item.item_qty, dnIds[i], user.username, user.username, now, now] as (string | number)[];
-    }));
+await batchAppendRows("sales_data", items.map((item) => {
+  const sku = item.item_sku.toUpperCase();
+  const m = itemMap.get(sku)!;
+  return [sales_user_id, salesId, sku, m.item_name, m.item_variant ?? "",
+    m.item_category ?? "", item.item_qty, dnId,
+    user.username, user.username, now, now] as (string | number)[];
+}));
 
-    // WRITE 3: batch append delivery_note_sales (1 API call)
-    await batchAppendRows("delivery_note_sales", items.map((item, i) => {
-      const sku = item.item_sku.toUpperCase();
-      const m = itemMap.get(sku)!;
-      return [dnIds[i], sku, m.item_name, item.item_qty,
-        user.username, user.username, now, now] as (string | number)[];
-    }));
+await batchAppendRows("delivery_note_sales", items.map((item) => {
+  const sku = item.item_sku.toUpperCase();
+  const m = itemMap.get(sku)!;
+  return [dnId, sku, m.item_name, item.item_qty,
+    user.username, user.username, now, now] as (string | number)[];
+}));
 
     // Total: 1 batchRead + 1 batchUpdate + 2 batchAppend = 4 API calls (any item count)
 
-    return NextResponse.json({
-      message: `${items.length} item berhasil disimpan`,
-      results: items.map((item, i) => ({
-        item_sku: item.item_sku.toUpperCase(),
-        sales_id: salesIds[i],
-        dn: dnIds[i],
-      })),
-    });
+return NextResponse.json({
+  message: `${items.length} item berhasil disimpan`,
+  results: items.map((item) => ({
+    item_sku: item.item_sku.toUpperCase(),
+    sales_id: salesId,
+    dn: dnId,
+  })),
+});
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 });
   }

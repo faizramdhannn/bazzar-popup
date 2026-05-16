@@ -155,11 +155,12 @@ export async function deleteRow(sheetName: string, rowIndex: number) {
 // ─── Auto-number helpers ──────────────────────────────────────────────────────
 export async function getNextOpnameId(): Promise<string> {
   const rows = await readSheet("stock_opname");
-  const ids = rows
+  const nums = rows
     .map((r) => r.opname_id)
-    .filter((id) => /^SO\d+$/.test(id))
-    .map((id) => parseInt(id.replace("SO", ""), 10));
-  const next = ids.length > 0 ? Math.max(...ids) + 1 : 1;
+    .filter((id) => typeof id === "string" && /^SO\d+$/.test(id))
+    .map((id) => parseInt(id.slice(2), 10))
+    .filter((n) => !isNaN(n));
+  const next = nums.length > 0 ? Math.max(...nums) + 1 : 1;
   return `SO${String(next).padStart(4, "0")}`;
 }
 
@@ -167,45 +168,45 @@ export async function getNextDeliveryNoteId(): Promise<string> {
   const year = new Date().getFullYear();
   const rows = await readSheet("delivery_note_sales");
   const prefix = `MP-DN-${year}-`;
-  const ids = rows
+  const nums = rows
     .map((r) => r.id_delivery_note)
-    .filter((id) => id?.startsWith(prefix))
-    .map((id) => parseInt(id.replace(prefix, ""), 10));
-  const next = ids.length > 0 ? Math.max(...ids) + 1 : 1;
+    .filter((id) => typeof id === "string" && id.startsWith(prefix))
+    .map((id) => parseInt(id.slice(prefix.length), 10))
+    .filter((n) => !isNaN(n));
+  const next = nums.length > 0 ? Math.max(...nums) + 1 : 1;
   return `${prefix}${String(next).padStart(4, "0")}`;
 }
 
 export async function getNextSalesId(): Promise<string> {
   const rows = await readSheet("sales_data");
-  const ids = rows
+  const nums = rows
     .map((r) => r.sales_id)
-    .filter((id) => /^SL\d+$/.test(id))
-    .map((id) => parseInt(id.replace("SL", ""), 10));
-  const next = ids.length > 0 ? Math.max(...ids) + 1 : 1;
+    .filter((id) => typeof id === "string" && /^SL\d+$/.test(id))
+    .map((id) => parseInt(id.slice(2), 10))
+    .filter((n) => !isNaN(n));
+  const next = nums.length > 0 ? Math.max(...nums) + 1 : 1;
   return `SL${String(next).padStart(4, "0")}`;
 }
 
 // ─── Generate a sequence of IDs from existing rows (no extra read) ────────────
 export function generateSalesIds(existingRows: Record<string, string>[], count: number): string[] {
-  const ids = existingRows
+  const nums = existingRows
     .map((r) => r.sales_id)
-    .filter((id) => /^SL\d+$/.test(id))
-    .map((id) => parseInt(id.replace("SL", ""), 10));
-  const next = ids.length > 0 ? Math.max(...ids) + 1 : 1;
+    .filter((id) => typeof id === "string" && /^SL\d+$/.test(id))
+    .map((id) => parseInt(id.slice(2), 10))
+    .filter((n) => !isNaN(n));
+  const next = nums.length > 0 ? Math.max(...nums) + 1 : 1;
   return Array.from({ length: count }, (_, i) => `SL${String(next + i).padStart(4, "0")}`);
 }
 
 export function generateDeliveryNoteIds(existingRows: Record<string, string>[], count: number): string[] {
   const year = new Date().getFullYear();
   const prefix = `MP-DN-${year}-`;
-  const ids = existingRows
+  const nums = existingRows
     .map((r) => r.id_delivery_note)
-    .filter((id) => id?.startsWith(prefix))
-    .map((id) => parseInt(id.replace(prefix, ""), 10));
-  const next = ids.length > 0 ? Math.max(...ids) + 1 : 1;
+    .filter((id) => typeof id === "string" && id.startsWith(prefix))
+    .map((id) => parseInt(id.slice(prefix.length), 10))
+    .filter((n) => !isNaN(n));
+  const next = nums.length > 0 ? Math.max(...nums) + 1 : 1;
   return Array.from({ length: count }, (_, i) => `${prefix}${String(next + i).padStart(4, "0")}`);
-}
-
-export function nowIso() {
-  return new Date().toISOString();
 }

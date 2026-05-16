@@ -50,7 +50,12 @@ export async function POST(req: NextRequest) {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const body = await req.json();
-    const { opname_user_id, popup_id, item_sku, item_qty_real, opname_id: existingOpnameId } = body;
+    const { popup_id, item_sku, item_qty_real, opname_id: existingOpnameId } = body;
+
+// Ambil user_id dari sheet users berdasarkan username session
+const usersRows = await readSheet("users");
+const userRow = usersRows.find((u) => u.username === user.username);
+const opname_user_id = userRow?.user_id ?? user.username;
 
     const now = nowIso();
     const opnameId = existingOpnameId || (await getNextOpnameId());
@@ -94,7 +99,10 @@ export async function PUT(req: NextRequest) {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const body = await req.json();
-    const { opname_user_id, opname_id, item_sku, item_qty_real } = body;
+    const { opname_id, item_sku, item_qty_real } = body;
+const usersRows = await readSheet("users");
+const userRow = usersRows.find((u) => u.username === user.username);
+const opname_user_id = userRow?.user_id ?? user.username;
 
     const rows = await readSheet("stock_opname");
     const idx = rows.findIndex(

@@ -326,7 +326,6 @@ export default function SalesPage() {
           <div>
             <label className="block text-xs font-medium text-zinc-500 mb-1">
               Scan Barcode
-              <span className="ml-1.5 text-zinc-400 font-normal">· paste banyak SKU sekaligus ✓</span>
             </label>
             <div className="flex gap-2">
               <input
