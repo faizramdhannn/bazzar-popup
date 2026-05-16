@@ -2,7 +2,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { readSheet, appendRow, nowIso } from "@/lib/sheets";
+import { readSheet, appendRow } from "@/lib/sheets";
+import { nowIso } from "@/lib/utils";
 import { SessionUser } from "@/types";
 
 export async function GET(req: NextRequest) {
