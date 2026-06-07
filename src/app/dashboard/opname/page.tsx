@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { DataTable } from "@/components/DataTable";
 import { Modal } from "@/components/Modal";
 import { ColumnDef } from "@tanstack/react-table";
-import { Plus, Trash2, ClipboardList, Eye, Pencil, Camera, CameraOff } from "lucide-react";
+import { Plus, Trash2, ClipboardList, Eye, Pencil, Camera, CameraOff, Download } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -44,6 +44,32 @@ interface MasterItem {
   item_category: string;
 }
 
+// ─── Export column config ─────────────────────────────────────────────────────
+
+const EXPORT_COLUMN_LABELS: Record<string, string> = {
+  opname_id: "Opname ID",
+  popup_id: "Popup",
+  item_sku: "Item Code",
+  item_name: "Item Name",
+  item_qty: "Real Scan",
+  item_cutoff_qty: "Cutoff Qty",
+  selisih: "Selisih",
+  created_by: "Dibuat Oleh",
+  created_at: "Tanggal",
+};
+
+const DEFAULT_EXPORT_COLUMNS: Record<string, boolean> = {
+  opname_id: true,
+  popup_id: true,
+  item_sku: true,
+  item_name: true,
+  item_qty: true,
+  item_cutoff_qty: true,
+  selisih: true,
+  created_by: true,
+  created_at: true,
+};
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function OpnamePage() {
@@ -68,10 +94,8 @@ export default function OpnamePage() {
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState("");
   const videoRef = useRef<HTMLVideoElement>(null);
-  // We dynamically import zxing to avoid SSR issues
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const codeReaderRef = useRef<any>(null);
-  // Cooldown to avoid counting one barcode multiple times in rapid succession
   const lastScanTimeRef = useRef<number>(0);
 
   // Save state
@@ -87,7 +111,13 @@ export default function OpnamePage() {
   const [editQty, setEditQty] = useState("");
   const [editSaving, setEditSaving] = useState(false);
 
-  // ─── Data fetching ──────────────────────────────────────────────────────────
+  // ─── Export state ──────────────────────────────────────────────────────────
+  const [showExport, setShowExport] = useState(false);
+  const [exportOpnameId, setExportOpnameId] = useState<string>("all");
+  const [exportColumns, setExportColumns] = useState<Record<string, boolean>>(DEFAULT_EXPORT_COLUMNS);
+  const [exporting, setExporting] = useState(false);
+
+  // ─── Data fetching ─────────────────────────────────────────────────────────
 
   const fetchGroups = useCallback(async () => {
     setLoading(true);
@@ -114,7 +144,7 @@ export default function OpnamePage() {
     }
   }, [showSession, sessionPopup, cameraActive]);
 
-  // ─── Camera lifecycle ───────────────────────────────────────────────────────
+  // ─── Camera lifecycle ──────────────────────────────────────────────────────
 
   useEffect(() => {
     if (!cameraActive || !videoRef.current || !sessionPopup) return;
@@ -137,7 +167,6 @@ export default function OpnamePage() {
             if (cancelled) return;
             if (!result) return;
 
-            // Cooldown: ignore if same barcode scanned within 1.5s
             const now = Date.now();
             if (now - lastScanTimeRef.current < 1500) return;
             lastScanTimeRef.current = now;
@@ -192,7 +221,7 @@ export default function OpnamePage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cameraActive, sessionPopup]);
 
-  // ─── Helpers ────────────────────────────────────────────────────────────────
+  // ─── Helpers ───────────────────────────────────────────────────────────────
 
   function getPopupName(id: string) {
     return popups.find((p) => p.id_location === id)?.popup_name ?? id;
@@ -211,7 +240,7 @@ export default function OpnamePage() {
     setCameraError("");
   }
 
-  // ─── Manual scan handlers ───────────────────────────────────────────────────
+  // ─── Manual scan handlers ──────────────────────────────────────────────────
 
   function handleScan() {
     const sku = scanSku.trim().toUpperCase();
@@ -252,46 +281,47 @@ export default function OpnamePage() {
     setSessionItems((prev) => prev.filter((r) => r.item_sku !== sku));
   }
 
-  // ─── Save opname ────────────────────────────────────────────────────────────
+  // ─── Save opname ───────────────────────────────────────────────────────────
 
   async function handleSave() {
-  if (!sessionPopup || sessionItems.length === 0) return;
-  setSaving(true);
-  setSaveError("");
-  try {
-    const res = await fetch("/api/opname/bulk", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        popup_id: sessionPopup,
-        items: sessionItems.map((item) => ({
-          item_sku: item.item_sku,
-          item_qty_real: item.real_scan,
-        })),
-      }),
-    });
-    const data: { error?: string; errors?: { item_sku: string; error: string }[]; opname_id?: string } = await res.json();
-    if (!res.ok) {
-      if (data.errors) {
-        setSaveError(data.errors.map((e) => `${e.item_sku}: ${e.error}`).join("\n"));
-      } else {
-        setSaveError(data.error ?? "Gagal menyimpan");
+    if (!sessionPopup || sessionItems.length === 0) return;
+    setSaving(true);
+    setSaveError("");
+    try {
+      const res = await fetch("/api/opname/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          popup_id: sessionPopup,
+          items: sessionItems.map((item) => ({
+            item_sku: item.item_sku,
+            item_qty_real: item.real_scan,
+          })),
+        }),
+      });
+      const data: { error?: string; errors?: { item_sku: string; error: string }[]; opname_id?: string } = await res.json();
+      if (!res.ok) {
+        if (data.errors) {
+          setSaveError(data.errors.map((e) => `${e.item_sku}: ${e.error}`).join("\n"));
+        } else {
+          setSaveError(data.error ?? "Gagal menyimpan");
+        }
+        return;
       }
-      return;
+      stopCamera();
+      setShowSession(false);
+      setSessionItems([]);
+      setSessionPopup("");
+      setScanSku("");
+      fetchGroups();
+    } catch (e) {
+      setSaveError(String(e));
+    } finally {
+      setSaving(false);
     }
-    stopCamera();
-    setShowSession(false);
-    setSessionItems([]);
-    setSessionPopup("");
-    setScanSku("");
-    fetchGroups();
-  } catch (e) {
-    setSaveError(String(e));
-  } finally {
-    setSaving(false);
   }
-}
-  // ─── Start new session ──────────────────────────────────────────────────────
+
+  // ─── Start new session ─────────────────────────────────────────────────────
 
   function startNewSession() {
     stopCamera();
@@ -309,7 +339,7 @@ export default function OpnamePage() {
     setShowSession(false);
   }
 
-  // ─── Detail / edit / delete ─────────────────────────────────────────────────
+  // ─── Detail / edit / delete ────────────────────────────────────────────────
 
   async function fetchDetail(opnameId: string) {
     const res = await fetch(`/api/opname?opname_id=${opnameId}`);
@@ -350,7 +380,94 @@ export default function OpnamePage() {
     fetchDetail(editRow.opname_id);
   }
 
-  // ─── Table columns ──────────────────────────────────────────────────────────
+  // ─── Export handler ────────────────────────────────────────────────────────
+
+  async function handleExport() {
+    const selectedCount = Object.values(exportColumns).filter(Boolean).length;
+    if (selectedCount === 0) return;
+
+    setExporting(true);
+    try {
+      const XLSX = await import("xlsx");
+
+      // Fetch detail rows
+      let rows: OpnameDetail[] = [];
+      if (exportOpnameId === "all") {
+        const ids = groups.map((g) => g.opname_id);
+        const details = await Promise.all(
+          ids.map((id) =>
+            fetch(`/api/opname?opname_id=${id}`).then((r) => r.json())
+          )
+        );
+        rows = details.flatMap((d) => d.data ?? []);
+      } else {
+        const res = await fetch(`/api/opname?opname_id=${exportOpnameId}`);
+        const data = await res.json();
+        rows = data.data ?? [];
+      }
+
+      // Build header row
+      const selectedKeys = Object.keys(EXPORT_COLUMN_LABELS).filter(
+        (key) => exportColumns[key]
+      );
+      const headers = selectedKeys.map((key) => EXPORT_COLUMN_LABELS[key]);
+
+      // Build data rows
+      const dataRows = rows.map((row) => {
+        const diff = Number(row.item_qty) - Number(row.item_cutoff_qty);
+        const valueMap: Record<string, string | number> = {
+          opname_id: row.opname_id,
+          popup_id: getPopupName(row.popup_id),
+          item_sku: row.item_sku,
+          item_name: row.item_name,
+          item_qty: Number(row.item_qty),
+          item_cutoff_qty: Number(row.item_cutoff_qty),
+          selisih: diff,
+          created_by: row.created_by,
+          created_at: row.created_at,
+        };
+        return selectedKeys.map((key) => valueMap[key]);
+      });
+
+      const sheetData = [headers, ...dataRows];
+      const ws = XLSX.utils.aoa_to_sheet(sheetData);
+
+      // Auto column width
+      ws["!cols"] = headers.map((h, i) => {
+        const maxLen = Math.max(
+          h.length,
+          ...dataRows.map((row) => String(row[i] ?? "").length)
+        );
+        return { wch: Math.min(maxLen + 4, 45) };
+      });
+
+      const wb = XLSX.utils.book_new();
+      const sheetName =
+        exportOpnameId === "all" ? "All Opname" : exportOpnameId;
+      XLSX.utils.book_append_sheet(wb, ws, sheetName);
+
+      const today = new Date().toISOString().slice(0, 10);
+      const fileName =
+        exportOpnameId === "all"
+          ? `stock_opname_all_${today}.xlsx`
+          : `stock_opname_${exportOpnameId}_${today}.xlsx`;
+
+      XLSX.writeFile(wb, fileName);
+      setShowExport(false);
+    } catch (e) {
+      alert("Export gagal: " + String(e));
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  function openExportModal() {
+    setExportOpnameId("all");
+    setExportColumns(DEFAULT_EXPORT_COLUMNS);
+    setShowExport(true);
+  }
+
+  // ─── Table columns ─────────────────────────────────────────────────────────
 
   const groupColumns: ColumnDef<OpnameGroup, unknown>[] = [
     { header: "Opname ID", accessorKey: "opname_id" },
@@ -449,8 +566,9 @@ export default function OpnamePage() {
   ];
 
   const totalUnits = sessionItems.reduce((s, r) => s + r.real_scan, 0);
+  const selectedColumnCount = Object.values(exportColumns).filter(Boolean).length;
 
-  // ─── Render ─────────────────────────────────────────────────────────────────
+  // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
     <div>
@@ -460,14 +578,26 @@ export default function OpnamePage() {
           <ClipboardList className="w-5 h-5" />
           <h1 className="text-lg md:text-xl font-semibold">Stock Opname</h1>
         </div>
-        <button
-          onClick={startNewSession}
-          className="flex items-center gap-1.5 px-3 py-2 text-sm bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-lg hover:opacity-90"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">Mulai Opname</span>
-          <span className="sm:hidden">Mulai</span>
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Export button */}
+          <button
+            onClick={openExportModal}
+            disabled={groups.length === 0}
+            className="flex items-center gap-1.5 px-3 py-2 text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Export</span>
+          </button>
+          {/* New opname button */}
+          <button
+            onClick={startNewSession}
+            className="flex items-center gap-1.5 px-3 py-2 text-sm bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-lg hover:opacity-90"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Mulai Opname</span>
+            <span className="sm:hidden">Mulai</span>
+          </button>
+        </div>
       </div>
 
       {loading ? (
@@ -591,13 +721,11 @@ export default function OpnamePage() {
                 muted
                 playsInline
               />
-              {/* Last scanned overlay */}
               {lastScanned && (
                 <div className="absolute bottom-2 left-2 right-2 bg-black/70 text-white text-xs rounded-lg px-3 py-2 text-center font-mono animate-pulse">
                   ✓ {lastScanned} ditambahkan
                 </div>
               )}
-              {/* Scan guide line */}
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <div className="w-3/4 h-0.5 bg-red-500/60 rounded-full" />
               </div>
@@ -672,7 +800,7 @@ export default function OpnamePage() {
           </div>
 
           {saveError && (
-            <p className="text-xs text-red-500">{saveError}</p>
+            <p className="text-xs text-red-500 whitespace-pre-line">{saveError}</p>
           )}
 
           {/* Actions */}
@@ -847,6 +975,117 @@ export default function OpnamePage() {
             </button>
           </div>
         )}
+      </Modal>
+
+      {/* ── Export Modal ───────────────────────────────────────────────────── */}
+      <Modal
+        open={showExport}
+        onClose={() => setShowExport(false)}
+        title="Export Stock Opname"
+        size="sm"
+      >
+        <div className="space-y-4">
+          {/* Pilih Opname ID */}
+          <div>
+            <label className="block text-xs font-medium text-zinc-500 mb-1.5">
+              Pilih Opname ID
+            </label>
+            <select
+              value={exportOpnameId}
+              onChange={(e) => setExportOpnameId(e.target.value)}
+              className="w-full rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-zinc-400 dark:focus:ring-zinc-500"
+            >
+              <option value="all">— Semua Opname —</option>
+              {groups.map((g) => (
+                <option key={g.opname_id} value={g.opname_id}>
+                  {g.opname_id} · {getPopupName(g.popup_id)} · {formatDate(g.date)}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Pilih Kolom */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-medium text-zinc-500">
+                Pilih Kolom
+              </label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setExportColumns(
+                      Object.fromEntries(
+                        Object.keys(EXPORT_COLUMN_LABELS).map((k) => [k, true])
+                      )
+                    )
+                  }
+                  className="text-xs text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 underline underline-offset-2"
+                >
+                  Pilih semua
+                </button>
+                <span className="text-zinc-300 dark:text-zinc-600">·</span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setExportColumns(
+                      Object.fromEntries(
+                        Object.keys(EXPORT_COLUMN_LABELS).map((k) => [k, false])
+                      )
+                    )
+                  }
+                  className="text-xs text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 underline underline-offset-2"
+                >
+                  Hapus semua
+                </button>
+              </div>
+            </div>
+            <div className="rounded-lg border border-zinc-200 dark:border-zinc-700 divide-y divide-zinc-100 dark:divide-zinc-800 overflow-hidden">
+              {Object.entries(EXPORT_COLUMN_LABELS).map(([key, label]) => (
+                <label
+                  key={key}
+                  className="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors select-none"
+                >
+                  <input
+                    type="checkbox"
+                    checked={exportColumns[key] ?? false}
+                    onChange={(e) =>
+                      setExportColumns((prev) => ({
+                        ...prev,
+                        [key]: e.target.checked,
+                      }))
+                    }
+                    className="rounded border-zinc-300 dark:border-zinc-600 accent-zinc-800 dark:accent-zinc-200 w-3.5 h-3.5 shrink-0"
+                  />
+                  <span className="text-sm text-zinc-700 dark:text-zinc-300">
+                    {label}
+                  </span>
+                </label>
+              ))}
+            </div>
+            <p className="mt-1.5 text-xs text-zinc-400">
+              {selectedColumnCount} dari {Object.keys(EXPORT_COLUMN_LABELS).length} kolom dipilih
+            </p>
+          </div>
+
+          {/* Actions */}
+          <div className="flex gap-2 pt-1 border-t border-zinc-100 dark:border-zinc-800">
+            <button
+              onClick={() => setShowExport(false)}
+              className="flex-1 py-2.5 text-sm border border-zinc-200 dark:border-zinc-700 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800"
+            >
+              Batal
+            </button>
+            <button
+              onClick={handleExport}
+              disabled={exporting || selectedColumnCount === 0}
+              className="flex-1 py-2.5 text-sm font-medium bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-lg hover:opacity-90 disabled:opacity-40 flex items-center justify-center gap-2"
+            >
+              <Download className="w-3.5 h-3.5" />
+              {exporting ? "Mengexport..." : "Download Excel"}
+            </button>
+          </div>
+        </div>
       </Modal>
     </div>
   );
