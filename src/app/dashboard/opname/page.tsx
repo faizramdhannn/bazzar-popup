@@ -255,39 +255,42 @@ export default function OpnamePage() {
   // ─── Save opname ────────────────────────────────────────────────────────────
 
   async function handleSave() {
-    if (!sessionPopup || sessionItems.length === 0) return;
-    setSaving(true);
-    setSaveError("");
-    try {
-      let opnameId: string | null = null;
-      for (const item of [...sessionItems].reverse()) {
-        const res = await fetch("/api/opname", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            popup_id: sessionPopup,
-            item_sku: item.item_sku,
-            item_qty_real: item.real_scan,
-            opname_id: opnameId,
-          }),
-        });
-        const data: { error?: string; opname_id?: string } = await res.json();
-        if (!res.ok) throw new Error(data.error ?? "Gagal menyimpan");
-        if (!opnameId) opnameId = data.opname_id ?? null;
+  if (!sessionPopup || sessionItems.length === 0) return;
+  setSaving(true);
+  setSaveError("");
+  try {
+    const res = await fetch("/api/opname/bulk", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        popup_id: sessionPopup,
+        items: sessionItems.map((item) => ({
+          item_sku: item.item_sku,
+          item_qty_real: item.real_scan,
+        })),
+      }),
+    });
+    const data: { error?: string; errors?: { item_sku: string; error: string }[]; opname_id?: string } = await res.json();
+    if (!res.ok) {
+      if (data.errors) {
+        setSaveError(data.errors.map((e) => `${e.item_sku}: ${e.error}`).join("\n"));
+      } else {
+        setSaveError(data.error ?? "Gagal menyimpan");
       }
-      stopCamera();
-      setShowSession(false);
-      setSessionItems([]);
-      setSessionPopup("");
-      setScanSku("");
-      fetchGroups();
-    } catch (e) {
-      setSaveError(String(e));
-    } finally {
-      setSaving(false);
+      return;
     }
+    stopCamera();
+    setShowSession(false);
+    setSessionItems([]);
+    setSessionPopup("");
+    setScanSku("");
+    fetchGroups();
+  } catch (e) {
+    setSaveError(String(e));
+  } finally {
+    setSaving(false);
   }
-
+}
   // ─── Start new session ──────────────────────────────────────────────────────
 
   function startNewSession() {
